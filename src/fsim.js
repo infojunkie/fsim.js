@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import dice from 'fast-dice-coefficient';
 import fs from 'fs';
 import meow from 'meow';
