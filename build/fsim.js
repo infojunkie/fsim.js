@@ -14,6 +14,8 @@ var _fs = _interopRequireDefault(require("fs"));
 
 var _meow = _interopRequireDefault(require("meow"));
 
+var _path = _interopRequireDefault(require("path"));
+
 var IGNORE_FILE = '.fsimignore';
 var SEPARATOR = '--';
 var MIN_RATING = 0.7; // https://stackoverflow.com/a/54577682/209184
@@ -25,11 +27,43 @@ function isMochaRunning(context) {
 }
 
 if (!isMochaRunning(global)) {
+  var OPTIONS = (0, _meow["default"])("\n    Usage: ".concat(_path["default"].basename(process.argv[1]), " /path/to/files\n\n    Options:\n      -i, --ignore              ignore file (").concat(IGNORE_FILE, ")\n      -r, --rating              minimum similarity rating (").concat(MIN_RATING, ")\n      -s, --separator           separator between similar sets (").concat(SEPARATOR, ")\n      -h, --help                show usage information\n      -v, --version             show version information\n    "), {
+    flags: {
+      ignore: {
+        type: 'string',
+        alias: 'i',
+        "default": IGNORE_FILE
+      },
+      rating: {
+        type: 'number',
+        alias: 'r',
+        "default": MIN_RATING
+      },
+      separator: {
+        type: 'string',
+        alias: 's',
+        "default": SEPARATOR
+      },
+      help: {
+        type: 'boolean',
+        alias: 'h'
+      },
+      version: {
+        type: 'boolean',
+        alias: 'v'
+      }
+    }
+  });
+
+  if (OPTIONS.flags['help'] || !OPTIONS.input.length) {
+    OPTIONS.showHelp();
+  }
+
   main({
-    dir: process.argv[2],
-    ignoreFile: IGNORE_FILE,
-    minRating: MIN_RATING,
-    separator: SEPARATOR
+    dir: OPTIONS.input[0],
+    ignoreFile: OPTIONS.flags['ignore'],
+    minRating: OPTIONS.flags['rating'],
+    separator: OPTIONS.flags['separator']
   });
 }
 

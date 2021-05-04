@@ -2,6 +2,7 @@
 import dice from 'fast-dice-coefficient';
 import fs from 'fs';
 import meow from 'meow';
+import path from 'path';
 
 const IGNORE_FILE = '.fsimignore';
 const SEPARATOR = '--';
@@ -15,11 +16,53 @@ function isMochaRunning(context) {
 }
 
 if (!isMochaRunning(global)) {
+  const OPTIONS = meow(`
+    Usage: ${path.basename(process.argv[1])} /path/to/files
+
+    Options:
+      -i, --ignore              ignore file (${IGNORE_FILE})
+      -r, --rating              minimum similarity rating (${MIN_RATING})
+      -s, --separator           separator between similar sets (${SEPARATOR})
+      -h, --help                show usage information
+      -v, --version             show version information
+    `, {
+      flags: {
+        ignore: {
+          type: 'string',
+          alias: 'i',
+          default: IGNORE_FILE
+        },
+        rating: {
+          type: 'number',
+          alias: 'r',
+          default: MIN_RATING
+        },
+        separator: {
+          type: 'string',
+          alias: 's',
+          default: SEPARATOR
+        },
+        help: {
+          type: 'boolean',
+          alias: 'h'
+        },
+        version: {
+          type: 'boolean',
+          alias: 'v'
+        }
+      }
+    }
+  );
+
+  if (OPTIONS.flags['help'] || !OPTIONS.input.length) {
+    OPTIONS.showHelp();
+  }
+
   main({
-    dir: process.argv[2],
-    ignoreFile: IGNORE_FILE,
-    minRating: MIN_RATING,
-    separator: SEPARATOR
+    dir: OPTIONS.input[0],
+    ignoreFile: OPTIONS.flags['ignore'],
+    minRating: OPTIONS.flags['rating'],
+    separator: OPTIONS.flags['separator']
   });
 }
 

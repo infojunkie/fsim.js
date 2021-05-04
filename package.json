@@ -1,6 +1,6 @@
 {
   "name": "fsim",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Find similarly-named files.",
   "main": "fsim.js",
   "repository": {
