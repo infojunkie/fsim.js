@@ -1,5 +1,6 @@
 # fsim
 
+[![npm version](https://badge.fury.io/js/fsim.svg)](https://badge.fury.io/js/fsim)
 ![GitHub Build Status](https://github.com/infojunkie/isbn-info/workflows/Test/badge.svg)
 
 A console tool to find similarly-named files.
