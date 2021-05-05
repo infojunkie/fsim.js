@@ -8,8 +8,6 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.main = main;
 
-var _assert = require("assert");
-
 var _fastDiceCoefficient = _interopRequireDefault(require("fast-dice-coefficient"));
 
 var _fs = _interopRequireDefault(require("fs"));

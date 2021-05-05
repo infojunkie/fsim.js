@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { match } from 'assert';
 import dice from 'fast-dice-coefficient';
 import fs from 'fs';
 import meow from 'meow';
