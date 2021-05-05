@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { match } from 'assert';
 import dice from 'fast-dice-coefficient';
 import fs from 'fs';
 import meow from 'meow';
@@ -21,7 +22,7 @@ if (!isMochaRunning(global)) {
 
     Options:
       -i, --ignore              ignore file (${IGNORE_FILE})
-      -r, --rating              minimum similarity rating (${MIN_RATING})
+      -m, --minimum             minimum similarity rating between 0.0 and 1.0 (${MIN_RATING})
       -s, --separator           separator between similar sets (${SEPARATOR})
       -h, --help                show usage information
       -v, --version             show version information
@@ -32,9 +33,9 @@ if (!isMochaRunning(global)) {
           alias: 'i',
           default: IGNORE_FILE
         },
-        rating: {
+        minimum: {
           type: 'number',
-          alias: 'r',
+          alias: 'm',
           default: MIN_RATING
         },
         separator: {
@@ -61,7 +62,7 @@ if (!isMochaRunning(global)) {
   main({
     dir: OPTIONS.input[0],
     ignoreFile: OPTIONS.flags['ignore'],
-    minRating: OPTIONS.flags['rating'],
+    minRating: OPTIONS.flags['minimum'],
     separator: OPTIONS.flags['separator']
   });
 }
@@ -71,13 +72,11 @@ export function main(options) {
   const files = fs.readdirSync(options.dir);
   let file;
   while (file = files.shift()) {
-    if (files.length) {
-      const matches = findSimilar(file, files, options.minRating, ignores);
-      if (matches.length) {
-        console.log(file);
-        matches.forEach(m => { console.log(m) });
-        console.log(options.separator);
-      }
+    const matches = findSimilar(file, files, options.minRating, ignores);
+    if (matches.length) {
+      console.log(file);
+      matches.forEach(match => { console.log(match.file) });
+      console.log(options.separator);
     }
   }
 }
@@ -86,8 +85,15 @@ function findSimilar(file, files, minRating, ignores) {
   const ignore = (ignores && ignores.get(file)) ?? [];
   return files.map(f => { return { file: f, rating: dice(file, f) }})
   .filter(r => r.rating > minRating && !ignore.includes(r.file))
-  .sort((r1,r2) => r1.rating - r2.rating)
-  .map(r => r.file)
+  .map(r => {
+    // Remove the matches files from the set before recursing on them.
+    files.splice(files.indexOf(r.file), 1);
+    return r;
+  })
+  .reduce((matches, r) => {
+    matches.push(r);
+    return matches.concat(findSimilar(r.file, files, minRating, ignores));
+  }, []);
 }
 
 function readIgnores(ignoreFile, separator) {

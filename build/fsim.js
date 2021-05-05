@@ -8,6 +8,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.main = main;
 
+var _assert = require("assert");
+
 var _fastDiceCoefficient = _interopRequireDefault(require("fast-dice-coefficient"));
 
 var _fs = _interopRequireDefault(require("fs"));
@@ -27,16 +29,16 @@ function isMochaRunning(context) {
 }
 
 if (!isMochaRunning(global)) {
-  var OPTIONS = (0, _meow["default"])("\n    Usage: ".concat(_path["default"].basename(process.argv[1]), " /path/to/files\n\n    Options:\n      -i, --ignore              ignore file (").concat(IGNORE_FILE, ")\n      -r, --rating              minimum similarity rating (").concat(MIN_RATING, ")\n      -s, --separator           separator between similar sets (").concat(SEPARATOR, ")\n      -h, --help                show usage information\n      -v, --version             show version information\n    "), {
+  var OPTIONS = (0, _meow["default"])("\n    Usage: ".concat(_path["default"].basename(process.argv[1]), " /path/to/files\n\n    Options:\n      -i, --ignore              ignore file (").concat(IGNORE_FILE, ")\n      -m, --minimum             minimum similarity rating between 0.0 and 1.0 (").concat(MIN_RATING, ")\n      -s, --separator           separator between similar sets (").concat(SEPARATOR, ")\n      -h, --help                show usage information\n      -v, --version             show version information\n    "), {
     flags: {
       ignore: {
         type: 'string',
         alias: 'i',
         "default": IGNORE_FILE
       },
-      rating: {
+      minimum: {
         type: 'number',
-        alias: 'r',
+        alias: 'm',
         "default": MIN_RATING
       },
       separator: {
@@ -62,7 +64,7 @@ if (!isMochaRunning(global)) {
   main({
     dir: OPTIONS.input[0],
     ignoreFile: OPTIONS.flags['ignore'],
-    minRating: OPTIONS.flags['rating'],
+    minRating: OPTIONS.flags['minimum'],
     separator: OPTIONS.flags['separator']
   });
 }
@@ -75,16 +77,14 @@ function main(options) {
   var file;
 
   while (file = files.shift()) {
-    if (files.length) {
-      var matches = findSimilar(file, files, options.minRating, ignores);
+    var matches = findSimilar(file, files, options.minRating, ignores);
 
-      if (matches.length) {
-        console.log(file);
-        matches.forEach(function (m) {
-          console.log(m);
-        });
-        console.log(options.separator);
-      }
+    if (matches.length) {
+      console.log(file);
+      matches.forEach(function (match) {
+        console.log(match.file);
+      });
+      console.log(options.separator);
     }
   }
 }
@@ -100,11 +100,14 @@ function findSimilar(file, files, minRating, ignores) {
     };
   }).filter(function (r) {
     return r.rating > minRating && !ignore.includes(r.file);
-  }).sort(function (r1, r2) {
-    return r1.rating - r2.rating;
   }).map(function (r) {
-    return r.file;
-  });
+    // Remove the matches files from the set before recursing on them.
+    files.splice(files.indexOf(r.file), 1);
+    return r;
+  }).reduce(function (matches, r) {
+    matches.push(r);
+    return matches.concat(findSimilar(r.file, files, minRating, ignores));
+  }, []);
 }
 
 function readIgnores(ignoreFile, separator) {
