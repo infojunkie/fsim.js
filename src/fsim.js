@@ -106,6 +106,7 @@ function readIgnores(ignoreFile, separator) {
         state.current = [];
       } else if (clean.length) {
         state.current.push(clean);
+        // FIXME if this is the very last line, add this last set.
       }
       return state;
     }, { ignores: new Map(), current: [] }).ignores;
