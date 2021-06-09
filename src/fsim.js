@@ -3,6 +3,7 @@ import dice from 'fast-dice-coefficient';
 import fs from 'fs';
 import meow from 'meow';
 import path from 'path';
+import progress from 'progress';
 
 const IGNORE_FILE = '.fsimignore';
 const SEPARATOR = '--';
@@ -69,15 +70,19 @@ if (!isMochaRunning(global)) {
 export function main(options) {
   const ignores = readIgnores(options.ignoreFile, options.separator);
   const files = fs.readdirSync(options.dir);
+  const total = files.length;
+  const bar = new progress(':bar :percent | ETA: :etas | :current/:total', { total, stream: process.stdout });
   let file;
   while (file = files.shift()) {
+    bar.tick();
     const matches = findSimilar(file, files, options.minRating, ignores);
     if (matches.length) {
-      console.log(file);
-      matches.forEach(match => { console.log(match.file) });
-      console.log(options.separator);
+      bar.interrupt(file);
+      matches.forEach(match => { bar.tick(); bar.interrupt(match.file) });
+      bar.interrupt(options.separator);
     }
   }
+  console.log(); // flush line
 }
 
 function findSimilar(file, files, minRating, ignores) {

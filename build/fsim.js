@@ -16,6 +16,8 @@ var _meow = _interopRequireDefault(require("meow"));
 
 var _path = _interopRequireDefault(require("path"));
 
+var _progress = _interopRequireDefault(require("progress"));
+
 var IGNORE_FILE = '.fsimignore';
 var SEPARATOR = '--';
 var MIN_RATING = 0.7; // https://stackoverflow.com/a/54577682/209184
@@ -72,19 +74,28 @@ function main(options) {
 
   var files = _fs["default"].readdirSync(options.dir);
 
+  var total = files.length;
+  var bar = new _progress["default"](':bar :percent | ETA: :etas | :current/:total', {
+    total: total,
+    stream: process.stdout
+  });
   var file;
 
   while (file = files.shift()) {
+    bar.tick();
     var matches = findSimilar(file, files, options.minRating, ignores);
 
     if (matches.length) {
-      console.log(file);
+      bar.interrupt(file);
       matches.forEach(function (match) {
-        console.log(match.file);
+        bar.tick();
+        bar.interrupt(match.file);
       });
-      console.log(options.separator);
+      bar.interrupt(options.separator);
     }
   }
+
+  console.log(); // flush line
 }
 
 function findSimilar(file, files, minRating, ignores) {
@@ -122,7 +133,7 @@ function readIgnores(ignoreFile, separator) {
         });
         state.current = [];
       } else if (clean.length) {
-        state.current.push(clean);
+        state.current.push(clean); // FIXME if this is the very last line, add this last set.
       }
 
       return state;
