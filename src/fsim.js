@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-import dice from 'fast-dice-coefficient';
 import fs from 'fs';
 import meow from 'meow';
 import path from 'path';
+import dice from 'fast-dice-coefficient';
 
 const IGNORE_FILE = '.fsimignore';
 const SEPARATOR = '--';
 const MIN_RATING = 0.7;
+
+const bigrams = new Map;
 
 // https://stackoverflow.com/a/54577682/209184
 function isMochaRunning(context) {
@@ -84,10 +86,14 @@ export function fsim(options) {
   return results;
 }
 
+function stripExtension(file) {
+  return file.replace(/\.[^/.]+$/, '');
+}
+
 function findSimilar(file, files, minRating, ignores) {
   const ignore = (ignores && ignores.get(file)) ?? [];
-  // Calculate file distance after removing extension.
-  return files.map(f => { return { file: f, rating: dice(file.replace(/\.[^/.]+$/, ''), f.replace(/\.[^/.]+$/, '')) }})
+  // Calculate distance between filenames after removing file extension.
+  return files.map(f => { return { file: f, rating: diceMemo(stripExtension(file), stripExtension(f)) }})
   .filter(r => r.rating > minRating && !ignore.includes(r.file))
   .map(r => {
     // Remove the matches files from the set before recursing on them.
@@ -119,4 +125,38 @@ function readIgnores(ignoreFile, separator) {
   catch (e) {
     return new Map();
   }
+}
+
+// Adaptation of
+// https://github.com/ka-weihe/fast-dice-coefficient/blob/master/dice.js
+// with memoization
+
+function getBigrams(str) {
+  const map = bigrams.get(str) || new Map;
+  if (!map.size) {
+    let i, j, ref, sub;
+    for (i = j = 0, ref = str.length - 2; (0 <= ref ? j <= ref : j >= ref); i = 0 <= ref ? ++j : --j) {
+      sub = str.substr(i, 2);
+      if (map.has(sub)) {
+        map.set(sub, map.get(sub) + 1);
+      } else {
+        map.set(sub, 1);
+      }
+    }
+    bigrams.set(str, map);
+  }
+  return map;
+}
+
+function diceMemo(fst, snd) {
+  if (fst.length < 2 || snd.length < 2) {
+    return 0;
+  }
+  const map1 = getBigrams(fst);
+  const map2 = getBigrams(snd);
+  let match = 0;
+  map1.forEach((v, k) => {
+    match += Math.min(v, map2.get(k) || 0);
+  });
+  return 2.0 * match / (fst.length + snd.length - 2);
 }
