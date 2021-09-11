@@ -3,7 +3,6 @@ import dice from 'fast-dice-coefficient';
 import fs from 'fs';
 import meow from 'meow';
 import path from 'path';
-import progress from 'progress';
 
 const IGNORE_FILE = '.fsimignore';
 const SEPARATOR = '--';
@@ -59,35 +58,36 @@ if (!isMochaRunning(global)) {
     OPTIONS.showHelp();
   }
 
-  main({
+  const results = fsim({
     dir: OPTIONS.input[0],
     ignoreFile: OPTIONS.flags['ignore'],
     minRating: OPTIONS.flags['minimum'],
     separator: OPTIONS.flags['separator']
   });
+  results.forEach(result => {
+    result.forEach(file => { console.log(file); });
+    console.log(OPTIONS.flags['separator']);
+  });
 }
 
-export function main(options) {
+export function fsim(options) {
   const ignores = readIgnores(options.ignoreFile, options.separator);
   const files = fs.readdirSync(options.dir);
-  const total = files.length;
-  const bar = new progress(':bar :percent | ETA: :etas | :current/:total', { total, stream: process.stdout });
+  const results = [];
   let file;
   while (file = files.shift()) {
-    bar.tick();
     const matches = findSimilar(file, files, options.minRating, ignores);
     if (matches.length) {
-      bar.interrupt(file);
-      matches.forEach(match => { bar.tick(); bar.interrupt(match.file) });
-      bar.interrupt(options.separator);
+      results.push(Array(file).concat(matches.map(match => match.file)));
     }
   }
-  console.log(); // flush line
+  return results;
 }
 
 function findSimilar(file, files, minRating, ignores) {
   const ignore = (ignores && ignores.get(file)) ?? [];
-  return files.map(f => { return { file: f, rating: dice(file, f) }})
+  // Calculate file distance after removing extension.
+  return files.map(f => { return { file: f, rating: dice(file.replace(/\.[^/.]+$/, ''), f.replace(/\.[^/.]+$/, '')) }})
   .filter(r => r.rating > minRating && !ignore.includes(r.file))
   .map(r => {
     // Remove the matches files from the set before recursing on them.

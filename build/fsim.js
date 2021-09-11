@@ -6,7 +6,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.main = main;
+exports.fsim = fsim;
 
 var _fastDiceCoefficient = _interopRequireDefault(require("fast-dice-coefficient"));
 
@@ -15,8 +15,6 @@ var _fs = _interopRequireDefault(require("fs"));
 var _meow = _interopRequireDefault(require("meow"));
 
 var _path = _interopRequireDefault(require("path"));
-
-var _progress = _interopRequireDefault(require("progress"));
 
 var IGNORE_FILE = '.fsimignore';
 var SEPARATOR = '--';
@@ -61,51 +59,50 @@ if (!isMochaRunning(global)) {
     OPTIONS.showHelp();
   }
 
-  main({
+  var results = fsim({
     dir: OPTIONS.input[0],
     ignoreFile: OPTIONS.flags['ignore'],
     minRating: OPTIONS.flags['minimum'],
     separator: OPTIONS.flags['separator']
   });
+  results.forEach(function (result) {
+    result.forEach(function (file) {
+      console.log(file);
+    });
+    console.log(OPTIONS.flags['separator']);
+  });
 }
 
-function main(options) {
+function fsim(options) {
   var ignores = readIgnores(options.ignoreFile, options.separator);
 
   var files = _fs["default"].readdirSync(options.dir);
 
-  var total = files.length;
-  var bar = new _progress["default"](':bar :percent | ETA: :etas | :current/:total', {
-    total: total,
-    stream: process.stdout
-  });
+  var results = [];
   var file;
 
   while (file = files.shift()) {
-    bar.tick();
     var matches = findSimilar(file, files, options.minRating, ignores);
 
     if (matches.length) {
-      bar.interrupt(file);
-      matches.forEach(function (match) {
-        bar.tick();
-        bar.interrupt(match.file);
-      });
-      bar.interrupt(options.separator);
+      results.push(Array(file).concat(matches.map(function (match) {
+        return match.file;
+      })));
     }
   }
 
-  console.log(); // flush line
+  return results;
 }
 
 function findSimilar(file, files, minRating, ignores) {
   var _ref;
 
-  var ignore = (_ref = ignores && ignores.get(file)) !== null && _ref !== void 0 ? _ref : [];
+  var ignore = (_ref = ignores && ignores.get(file)) !== null && _ref !== void 0 ? _ref : []; // Calculate file distance after removing extension.
+
   return files.map(function (f) {
     return {
       file: f,
-      rating: (0, _fastDiceCoefficient["default"])(file, f)
+      rating: (0, _fastDiceCoefficient["default"])(file.replace(/\.[^/.]+$/, ''), f.replace(/\.[^/.]+$/, ''))
     };
   }).filter(function (r) {
     return r.rating > minRating && !ignore.includes(r.file);
