@@ -2,7 +2,6 @@
 import fs from 'fs';
 import meow from 'meow';
 import path from 'path';
-import dice from 'fast-dice-coefficient';
 
 const IGNORE_FILE = '.fsimignore';
 const SEPARATOR = '--';
