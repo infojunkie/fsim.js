@@ -14,8 +14,6 @@ var _meow = _interopRequireDefault(require("meow"));
 
 var _path = _interopRequireDefault(require("path"));
 
-var _fastDiceCoefficient = _interopRequireDefault(require("fast-dice-coefficient"));
-
 var IGNORE_FILE = '.fsimignore';
 var SEPARATOR = '--';
 var MIN_RATING = 0.7;
