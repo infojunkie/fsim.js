@@ -36,4 +36,18 @@ describe('fsim', function() {
       ]
     ]);
   });
+
+  it('Works with caching', () => {
+    const results = fsim({
+      dir: './test/data/files',
+      ignoreFile: null,
+      minRating: 0.7,
+      separator: '--',
+      cache: true,
+    });
+    const cacheFile = './test/data/files/.fsimcache';
+    assert.ok(fs.existsSync(cacheFile));
+    assert.doesNotThrow(() => { JSON.parse(fs.readFileSync(cacheFile, { encoding: 'utf-8' })); });
+    fs.unlinkSync(cacheFile);
+  });
 });

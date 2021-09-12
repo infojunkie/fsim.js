@@ -4,10 +4,11 @@ import meow from 'meow';
 import path from 'path';
 
 const IGNORE_FILE = '.fsimignore';
+const CACHE_FILE = '.fsimcache';
 const SEPARATOR = '--';
 const MIN_RATING = 0.7;
 
-const bigrams = new Map;
+let bigrams = new Map;
 
 // https://stackoverflow.com/a/54577682/209184
 function isMochaRunning(context) {
@@ -21,9 +22,10 @@ if (!isMochaRunning(global)) {
     Usage: ${path.basename(process.argv[1])} /path/to/files
 
     Options:
-      -i, --ignore              ignore file (${IGNORE_FILE})
-      -m, --minimum             minimum similarity rating between 0.0 and 1.0 (${MIN_RATING})
-      -s, --separator           separator between similar sets (${SEPARATOR})
+      -i, --ignore              ignore file (default: ${IGNORE_FILE})
+      -m, --minimum             minimum similarity rating between 0.0 and 1.0 (default: ${MIN_RATING})
+      -s, --separator           separator between similar sets (default: ${SEPARATOR})
+      -c, --cache               use a per-directory cache of bigrams (default: no cache)
       -h, --help                show usage information
       -v, --version             show version information
     `, {
@@ -42,6 +44,10 @@ if (!isMochaRunning(global)) {
           type: 'string',
           alias: 's',
           default: SEPARATOR
+        },
+        cache: {
+          type: 'boolean',
+          alias: 'c',
         },
         help: {
           type: 'boolean',
@@ -63,7 +69,8 @@ if (!isMochaRunning(global)) {
     dir: OPTIONS.input[0],
     ignoreFile: OPTIONS.flags['ignore'],
     minRating: OPTIONS.flags['minimum'],
-    separator: OPTIONS.flags['separator']
+    separator: OPTIONS.flags['separator'],
+    cache: OPTIONS.flags['cache']
   });
   results.forEach(result => {
     result.forEach(file => { console.log(file); });
@@ -71,7 +78,37 @@ if (!isMochaRunning(global)) {
   });
 }
 
+// https://stackoverflow.com/a/56150320/209184
+function replacerMap(key, value) {
+  if (value instanceof Map) {
+    return {
+      dataType: 'Map',
+      value: Array.from(value.entries()), // or with spread: value: [...value]
+    };
+  } else {
+    return value;
+  }
+}
+function reviverMap(key, value) {
+  if (typeof value === 'object' && value !== null) {
+    if (value.dataType === 'Map') {
+      return new Map(value.value);
+    }
+  }
+  return value;
+}
+
 export function fsim(options) {
+  const fileCache = options.dir + path.sep + CACHE_FILE;
+  if (options.cache && fs.existsSync(fileCache)) {
+    try {
+      bigrams = new Map(JSON.parse(fs.readFileSync(fileCache, { encoding: 'utf8', flag: 'r' }), reviverMap));
+    }
+    catch (e) {
+      console.warn(`Failed to read cache file ${fileCache}: ${e.message}`);
+    }
+  }
+
   const ignores = readIgnores(options.ignoreFile, options.separator);
   const files = fs.readdirSync(options.dir);
   const results = [];
@@ -82,11 +119,25 @@ export function fsim(options) {
       results.push(Array(file).concat(matches.map(match => match.file)));
     }
   }
+
+  if (options.cache) {
+    try {
+      fs.writeFileSync(fileCache, JSON.stringify(bigrams, replacerMap), { encoding: 'utf8', flag: 'w' });
+    }
+    catch (e) {
+      console.warn(`Failed to write cache file ${fileCache}: ${e.message}`);
+    }
+  }
+
   return results;
 }
 
 function stripExtension(file) {
-  return file.replace(/\.[^/.]+$/, '');
+  const dot = file.lastIndexOf('.');
+  if (dot > -1 && file.length - dot < 10) {
+    return file.slice(0, dot);
+  }
+  return file;
 }
 
 function findSimilar(file, files, minRating, ignores) {
