@@ -8,11 +8,11 @@ A console tool to find similarly-named files.
 ```
 npm i -g fsim
 fsim /path/to/files
-// TCP-IP Illustrated, Volume 1: The Protocols - W. Richard Stevens
-// TCP-IP Illustrated, Volume 2: The Implementation - W. Richard Stevens
+// TCP-IP Illustrated, Volume 1: The Protocols - W. Richard Stevens.txt
+// TCP-IP Illustrated, Volume 2: The Implementation - W. Richard Stevens.pdf
 // --
-// The Art of Computer Programming, Vol. 1: Fundamental Algorithms - Donald E. Knuth
-// The Art of Computer Programming, Vol. 2: Seminumerical Algorithms - Donald E. Knuth
+// The Art of Computer Programming, Vol. 1: Fundamental Algorithms - Donald E. Knuth.txt
+// The Art of Computer Programming, Vol. 2: Seminumerical Algorithms - Donald E. Knuth.epub
 // --
 ```
 
