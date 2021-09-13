@@ -166,7 +166,7 @@ function findSimilar(file, files, minRating, ignores) {
   return files.map(function (f) {
     return {
       file: f,
-      rating: diceMemo(stripExtension(file), stripExtension(f))
+      rating: dice(stripExtension(file), stripExtension(f))
     };
   }).filter(function (r) {
     return r.rating > minRating && !ignore.includes(r.file);
@@ -203,11 +203,12 @@ function readIgnores(ignoreFile, separator) {
       current: []
     }).ignores;
   } catch (e) {
+    console.warn("Failed to read ignore file ".concat(ignoreFile, ": ").concat(e.message));
     return new Map();
   }
-} // Adaptation of
-// https://github.com/ka-weihe/fast-dice-coefficient/blob/master/dice.js
-// with memoization
+} // Implementation of Dice coefficient with memoization of bigrams
+// https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+// Adapted from https://github.com/ka-weihe/fast-dice-coefficient
 
 
 function getBigrams(str) {
@@ -232,7 +233,7 @@ function getBigrams(str) {
   return map;
 }
 
-function diceMemo(fst, snd) {
+function dice(fst, snd) {
   if (fst.length < 2 || snd.length < 2) {
     return 0;
   }

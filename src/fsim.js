@@ -143,7 +143,7 @@ function stripExtension(file) {
 function findSimilar(file, files, minRating, ignores) {
   const ignore = (ignores && ignores.get(file)) ?? [];
   // Calculate distance between filenames after removing file extension.
-  return files.map(f => { return { file: f, rating: diceMemo(stripExtension(file), stripExtension(f)) }})
+  return files.map(f => { return { file: f, rating: dice(stripExtension(file), stripExtension(f)) }})
   .filter(r => r.rating > minRating && !ignore.includes(r.file))
   .map(r => {
     // Remove the matches files from the set before recursing on them.
@@ -173,14 +173,14 @@ function readIgnores(ignoreFile, separator) {
     }, { ignores: new Map(), current: [] }).ignores;
   }
   catch (e) {
+    console.warn(`Failed to read ignore file ${ignoreFile}: ${e.message}`);
     return new Map();
   }
 }
 
-// Adaptation of
-// https://github.com/ka-weihe/fast-dice-coefficient/blob/master/dice.js
-// with memoization
-
+// Implementation of Dice coefficient with memoization of bigrams
+// https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+// Adapted from https://github.com/ka-weihe/fast-dice-coefficient
 function getBigrams(str) {
   const map = bigrams.get(str) || new Map;
   if (!map.size) {
@@ -198,7 +198,7 @@ function getBigrams(str) {
   return map;
 }
 
-function diceMemo(fst, snd) {
+function dice(fst, snd) {
   if (fst.length < 2 || snd.length < 2) {
     return 0;
   }
