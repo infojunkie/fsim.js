@@ -21,10 +21,11 @@ fsim /path/to/files
   Usage: fsim /path/to/files
 
   Options:
-    -i, --ignore              ignore file (default: .fsimignore)
     -m, --minimum             minimum similarity rating between 0.0 and 1.0 (default: 0.7)
     -s, --separator           separator between similar sets (default: --)
     -c, --cache               use a per-directory cache of bigrams (default: no cache)
     -h, --help                show usage information
     -v, --version             show version information
 ```
+
+If `fsim` finds a file `/path/to/files/.fsimignore` with the same format as its own output, it will read it and ignore the similar results that it finds contained therein. This is useful to ignore similarly-named files that are known to be different.

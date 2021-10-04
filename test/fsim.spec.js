@@ -4,10 +4,16 @@ const fs = require('fs');
 const fsim = require('../src/fsim').fsim;
 
 describe('fsim', function() {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   it('Finds similarly-named files', () => {
+    const ignoreFile = './test/data/files/.fsimignore';
+    sinon.stub(fs, 'existsSync').withArgs(ignoreFile).returns(false);
+    fs.existsSync.callThrough(); // call original if not passing ignoreFile argument
     const results = fsim({
       dir: './test/data/files',
-      ignoreFile: null,
       minRating: 0.7,
       separator: '--'
     });
@@ -25,7 +31,6 @@ describe('fsim', function() {
   it('Ignores specified files', () => {
     const results = fsim({
       dir: './test/data/files',
-      ignoreFile: './test/data/ignore',
       minRating: 0.7,
       separator: '--'
     });
@@ -40,7 +45,6 @@ describe('fsim', function() {
   it('Works with caching', () => {
     const results = fsim({
       dir: './test/data/files',
-      ignoreFile: null,
       minRating: 0.7,
       separator: '--',
       cache: true,

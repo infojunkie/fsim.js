@@ -22,7 +22,6 @@ if (!isMochaRunning(global)) {
     Usage: ${path.basename(process.argv[1])} /path/to/files
 
     Options:
-      -i, --ignore              ignore file (default: ${IGNORE_FILE})
       -m, --minimum             minimum similarity rating between 0.0 and 1.0 (default: ${MIN_RATING})
       -s, --separator           separator between similar sets (default: ${SEPARATOR})
       -c, --cache               use a per-directory cache of bigrams (default: no cache)
@@ -30,11 +29,6 @@ if (!isMochaRunning(global)) {
       -v, --version             show version information
     `, {
       flags: {
-        ignore: {
-          type: 'string',
-          alias: 'i',
-          default: IGNORE_FILE
-        },
         minimum: {
           type: 'number',
           alias: 'm',
@@ -67,7 +61,6 @@ if (!isMochaRunning(global)) {
 
   const results = fsim({
     dir: OPTIONS.input[0],
-    ignoreFile: OPTIONS.flags['ignore'],
     minRating: OPTIONS.flags['minimum'],
     separator: OPTIONS.flags['separator'],
     cache: OPTIONS.flags['cache']
@@ -109,7 +102,7 @@ export function fsim(options) {
     }
   }
 
-  const ignores = readIgnores(options.ignoreFile, options.separator);
+  const ignores = readIgnores(options.dir + path.sep + IGNORE_FILE, options.separator);
   const files = fs.readdirSync(options.dir);
   const results = [];
   let file;
@@ -157,6 +150,8 @@ function findSimilar(file, files, minRating, ignores) {
 }
 
 function readIgnores(ignoreFile, separator) {
+  if (!fs.existsSync(ignoreFile)) return new Map();
+
   try {
     return fs.readFileSync(ignoreFile, { encoding: 'utf8', flag: 'r' }).split(/[\n\r]/).reduce((state, line) => {
       const clean = line.trim();
@@ -184,14 +179,11 @@ function readIgnores(ignoreFile, separator) {
 function getBigrams(str) {
   const map = bigrams.get(str) || new Map;
   if (!map.size) {
-    let i, j, ref, sub;
+    let i, j, ref;
     for (i = j = 0, ref = str.length - 2; (0 <= ref ? j <= ref : j >= ref); i = 0 <= ref ? ++j : --j) {
-      sub = str.substr(i, 2);
-      if (map.has(sub)) {
-        map.set(sub, map.get(sub) + 1);
-      } else {
-        map.set(sub, 1);
-      }
+      const bi = str.substr(i, 2);
+      const repeats = 1 + (map.get(bi) || 0);
+      map.set(bi, repeats);
     }
     bigrams.set(str, map);
   }

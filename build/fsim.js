@@ -29,13 +29,8 @@ function isMochaRunning(context) {
 }
 
 if (!isMochaRunning(global)) {
-  var OPTIONS = (0, _meow["default"])("\n    Usage: ".concat(_path["default"].basename(process.argv[1]), " /path/to/files\n\n    Options:\n      -i, --ignore              ignore file (default: ").concat(IGNORE_FILE, ")\n      -m, --minimum             minimum similarity rating between 0.0 and 1.0 (default: ").concat(MIN_RATING, ")\n      -s, --separator           separator between similar sets (default: ").concat(SEPARATOR, ")\n      -c, --cache               use a per-directory cache of bigrams (default: no cache)\n      -h, --help                show usage information\n      -v, --version             show version information\n    "), {
+  var OPTIONS = (0, _meow["default"])("\n    Usage: ".concat(_path["default"].basename(process.argv[1]), " /path/to/files\n\n    Options:\n      -m, --minimum             minimum similarity rating between 0.0 and 1.0 (default: ").concat(MIN_RATING, ")\n      -s, --separator           separator between similar sets (default: ").concat(SEPARATOR, ")\n      -c, --cache               use a per-directory cache of bigrams (default: no cache)\n      -h, --help                show usage information\n      -v, --version             show version information\n    "), {
     flags: {
-      ignore: {
-        type: 'string',
-        alias: 'i',
-        "default": IGNORE_FILE
-      },
       minimum: {
         type: 'number',
         alias: 'm',
@@ -67,7 +62,6 @@ if (!isMochaRunning(global)) {
 
   var results = fsim({
     dir: OPTIONS.input[0],
-    ignoreFile: OPTIONS.flags['ignore'],
     minRating: OPTIONS.flags['minimum'],
     separator: OPTIONS.flags['separator'],
     cache: OPTIONS.flags['cache']
@@ -117,7 +111,7 @@ function fsim(options) {
     }
   }
 
-  var ignores = readIgnores(options.ignoreFile, options.separator);
+  var ignores = readIgnores(options.dir + _path["default"].sep + IGNORE_FILE, options.separator);
 
   var files = _fs["default"].readdirSync(options.dir);
 
@@ -181,6 +175,8 @@ function findSimilar(file, files, minRating, ignores) {
 }
 
 function readIgnores(ignoreFile, separator) {
+  if (!_fs["default"].existsSync(ignoreFile)) return new Map();
+
   try {
     return _fs["default"].readFileSync(ignoreFile, {
       encoding: 'utf8',
@@ -215,16 +211,12 @@ function getBigrams(str) {
   var map = bigrams.get(str) || new Map();
 
   if (!map.size) {
-    var i, j, ref, sub;
+    var i, j, ref;
 
     for (i = j = 0, ref = str.length - 2; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
-      sub = str.substr(i, 2);
-
-      if (map.has(sub)) {
-        map.set(sub, map.get(sub) + 1);
-      } else {
-        map.set(sub, 1);
-      }
+      var bi = str.substr(i, 2);
+      var repeats = 1 + (map.get(bi) || 0);
+      map.set(bi, repeats);
     }
 
     bigrams.set(str, map);
