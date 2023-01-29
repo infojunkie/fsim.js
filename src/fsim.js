@@ -22,6 +22,7 @@ if (!isMochaRunning(global)) {
     Usage: ${path.basename(process.argv[1])} /path/to/files
 
     Options:
+      -r, --recursive           recurse into subdirectories (default: no recursion)
       -m, --minimum             minimum similarity rating between 0.0 and 1.0 (default: ${MIN_RATING})
       -s, --separator           separator between similar sets (default: ${SEPARATOR})
       -c, --cache               use a per-directory cache of bigrams (default: no cache)
@@ -29,6 +30,10 @@ if (!isMochaRunning(global)) {
       -v, --version             show version information
     `, {
       flags: {
+        recursive: {
+          type: 'boolean',
+          alias: 'r',
+        },
         minimum: {
           type: 'number',
           alias: 'm',
@@ -63,7 +68,8 @@ if (!isMochaRunning(global)) {
     dir: OPTIONS.input[0],
     minRating: OPTIONS.flags['minimum'],
     separator: OPTIONS.flags['separator'],
-    cache: OPTIONS.flags['cache']
+    cache: OPTIONS.flags['cache'],
+    recursive: OPTIONS.flags['recursive'],
   });
   results.forEach(result => {
     result.forEach(file => { console.log(file); });
@@ -92,7 +98,7 @@ function reviverMap(key, value) {
 }
 
 export function fsim(options) {
-  const fileCache = options.dir + path.sep + CACHE_FILE;
+  const fileCache = path.join(options.dir, CACHE_FILE);
   if (options.cache && fs.existsSync(fileCache)) {
     try {
       bigrams = new Map(JSON.parse(fs.readFileSync(fileCache, { encoding: 'utf8', flag: 'r' }), reviverMap));
@@ -102,14 +108,14 @@ export function fsim(options) {
     }
   }
 
-  const ignores = readIgnores(options.dir + path.sep + IGNORE_FILE, options.separator);
-  const files = fs.readdirSync(options.dir);
+  const ignores = readIgnores(path.join(options.dir, IGNORE_FILE), options.separator);
+  const files = getFiles(options.dir, options.recursive);
   const results = [];
   let file;
   while (file = files.shift()) {
     const matches = findSimilar(file, files, options.minRating, ignores);
     if (matches.length) {
-      results.push(Array(file).concat(matches.map(match => match.file)));
+      results.push(Array(file.filepath).concat(matches.map(match => match.file.filepath)));
     }
   }
 
@@ -134,13 +140,14 @@ function stripExtension(file) {
 }
 
 function findSimilar(file, files, minRating, ignores) {
-  const ignore = (ignores && ignores.get(file)) ?? [];
-  // Calculate distance between filenames after removing file extension.
-  return files.map(f => { return { file: f, rating: dice(stripExtension(file), stripExtension(f)) }})
-  .filter(r => r.rating > minRating && !ignore.includes(r.file))
+  const ignore = (ignores && ignores.get(file.filepath)) ?? [];
+  // Calculate distance between filenames.
+  return files
+  .map(f => { return { file: f, rating: dice(file.filename, f.filename) }})
+  .filter(r => r.rating > minRating && !ignore.includes(r.file.filepath))
   .map(r => {
-    // Remove the matches files from the set before recursing on them.
-    files.splice(files.indexOf(r.file), 1);
+    // Remove the matched files from the set before recursing on them.
+    files.splice(files.findIndex(f => f.filepath === r.file.filepath), 1);
     return r;
   })
   .reduce((matches, r) => {
@@ -171,6 +178,18 @@ function readIgnores(ignoreFile, separator) {
     console.warn(`Failed to read ignore file ${ignoreFile}: ${e.message}`);
     return new Map();
   }
+}
+
+function getFiles(dir, recursive, prefix = null) {
+  return fs.readdirSync(dir).reduce((files, file) => {
+    const filepath = path.join(dir, file);
+    const isDirectory = fs.statSync(filepath).isDirectory();
+    const realPrefix = prefix ?? (path.normalize(dir) + path.sep);
+    return isDirectory && recursive ? [...files, ...getFiles(filepath, recursive, realPrefix)] : [...files, {
+      filepath: filepath.replace(realPrefix, ''),
+      filename: stripExtension(file)
+    }];
+  }, []);
 }
 
 // Implementation of Dice coefficient with memoization of bigrams
