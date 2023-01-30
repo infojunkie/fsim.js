@@ -21,6 +21,7 @@ fsim /path/to/files
   Usage: fsim /path/to/files
 
   Options:
+    -r, --recursive           recurse into subdirectories (default: no recursion)
     -m, --minimum             minimum similarity rating between 0.0 and 1.0 (default: 0.7)
     -s, --separator           separator between similar sets (default: --)
     -c, --cache               use a per-directory cache of bigrams (default: no cache)
