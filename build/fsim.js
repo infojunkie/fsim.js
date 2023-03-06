@@ -6,11 +6,14 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.fsim = fsim;
-var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
+var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
 var _fs = _interopRequireDefault(require("fs"));
 var _meow = _interopRequireDefault(require("meow"));
 var _path = _interopRequireDefault(require("path"));
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); enumerableOnly && (symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; })), keys.push.apply(keys, symbols); } return keys; }
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = null != arguments[i] ? arguments[i] : {}; i % 2 ? ownKeys(Object(source), !0).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)) : ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } return target; }
 var IGNORE_FILE = '.fsimignore';
 var CACHE_FILE = '.fsimcache';
 var SEPARATOR = '--';
@@ -77,7 +80,7 @@ function replacerMap(key, value) {
   if (value instanceof Map) {
     return {
       dataType: 'Map',
-      value: Array.from(value.entries()) // or with spread: value: [...value]
+      value: (0, _toConsumableArray2["default"])(value)
     };
   } else {
     return value;
@@ -104,17 +107,17 @@ function fsim(options) {
     }
   }
   var ignores = readIgnores(_path["default"].join(options.dir, IGNORE_FILE), options.separator);
-  var files = getFiles(options.dir, options.recursive);
   var results = [];
-  var file;
-  while (file = files.shift()) {
+  var files = getFiles(options.dir, options.recursive, _path["default"].normalize(options.dir + _path["default"].sep));
+  files.forEach(function (file) {
+    files["delete"](file.filepath);
     var matches = findSimilar(file, files, options.minRating, ignores);
     if (matches.length) {
       results.push(Array(file.filepath).concat(matches.map(function (match) {
-        return match.file.filepath;
+        return match.filepath;
       })));
     }
-  }
+  });
   if (options.cache) {
     try {
       _fs["default"].writeFileSync(fileCache, JSON.stringify(bigrams, replacerMap), {
@@ -134,26 +137,35 @@ function stripExtension(file) {
   }
   return file;
 }
-function findSimilar(file, files, minRating, ignores) {
+function findSimilar(ref, files, minRating, ignores) {
   var _ref;
-  var ignore = (_ref = ignores && ignores.get(file.filepath)) !== null && _ref !== void 0 ? _ref : [];
-  // Calculate distance between filenames.
-  return files.map(function (f) {
-    return {
-      file: f,
-      rating: dice(file.filename, f.filename)
-    };
-  }).filter(function (r) {
-    return r.rating > minRating && !ignore.includes(r.file.filepath);
-  }).map(function (r) {
-    // Remove the matched files from the set before recursing on them.
-    files.splice(files.findIndex(function (f) {
-      return f.filepath === r.file.filepath;
-    }), 1);
-    return r;
-  }).reduce(function (matches, r) {
-    matches.push(r);
-    return matches.concat(findSimilar(r.file, files, minRating, ignores));
+  var ignore = (_ref = ignores && ignores.get(ref.filepath)) !== null && _ref !== void 0 ? _ref : [];
+
+  // Find similar files to the reference:
+  return Array.from(files.values())
+  // 1. Filter out ignored files
+  .filter(function (file) {
+    return !ignore.includes(file.filepath);
+  })
+  // 2. Calculate distance between reference and candidate
+  .map(function (file) {
+    return _objectSpread(_objectSpread({}, file), {}, {
+      rating: dice(ref.filename, file.filename)
+    });
+  })
+  // 3. filter out results < threshold
+  .filter(function (file) {
+    return file.rating > minRating;
+  })
+  // 4. Remove results from active set before recursing.
+  .map(function (file) {
+    files["delete"](file.filepath);
+    return file;
+  })
+  // 5. Recurse on each result to aggregate similars.
+  .reduce(function (matches, file) {
+    matches.push(file);
+    return matches.concat(findSimilar(file, files, minRating, ignores));
   }, []);
 }
 function readIgnores(ignoreFile, separator) {
@@ -162,7 +174,7 @@ function readIgnores(ignoreFile, separator) {
     return _fs["default"].readFileSync(ignoreFile, {
       encoding: 'utf8',
       flag: 'r'
-    }).split(/[\n\r]/).reduce(function (state, line) {
+    }).split(/[\n\r]/).reduce(function (state, line, index, lines) {
       var clean = line.trim();
       if (clean === separator) {
         state.current.forEach(function (k) {
@@ -171,9 +183,7 @@ function readIgnores(ignoreFile, separator) {
         state.current = [];
       } else if (clean.length) {
         state.current.push(clean);
-        // FIXME if this is the very last line, add this last set.
       }
-
       return state;
     }, {
       ignores: new Map(),
@@ -184,17 +194,22 @@ function readIgnores(ignoreFile, separator) {
     return new Map();
   }
 }
-function getFiles(dir, recursive) {
-  var prefix = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+function getFiles(dir, recursive, prefix) {
   return _fs["default"].readdirSync(dir).reduce(function (files, file) {
     var filepath = _path["default"].join(dir, file);
-    var isDirectory = _fs["default"].statSync(filepath).isDirectory();
-    var realPrefix = prefix !== null && prefix !== void 0 ? prefix : _path["default"].normalize(dir) + _path["default"].sep;
-    return isDirectory && recursive ? [].concat((0, _toConsumableArray2["default"])(files), (0, _toConsumableArray2["default"])(getFiles(filepath, recursive, realPrefix))) : [].concat((0, _toConsumableArray2["default"])(files), [{
-      filepath: filepath.replace(realPrefix, ''),
-      filename: stripExtension(file)
-    }]);
-  }, []);
+    if (_fs["default"].statSync(filepath).isDirectory()) {
+      if (recursive) {
+        return new Map([].concat((0, _toConsumableArray2["default"])(files), (0, _toConsumableArray2["default"])(getFiles(filepath, recursive, prefix))));
+      }
+    } else {
+      var relpath = filepath.replace(prefix, '');
+      files.set(relpath, {
+        filepath: relpath,
+        filename: stripExtension(file)
+      });
+    }
+    return files;
+  }, new Map());
 }
 
 // Implementation of Dice coefficient with memoization of bigrams
@@ -220,8 +235,18 @@ function dice(fst, snd) {
   var map1 = getBigrams(fst);
   var map2 = getBigrams(snd);
   var match = 0;
-  map1.forEach(function (v, k) {
-    match += Math.min(v, map2.get(k) || 0);
-  });
+  if (map1.length > map2.length) {
+    map2.forEach(function (v, k) {
+      if (map1.has(k)) {
+        match += Math.min(v, map1.get(k));
+      }
+    });
+  } else {
+    map1.forEach(function (v, k) {
+      if (map2.has(k)) {
+        match += Math.min(v, map2.get(k));
+      }
+    });
+  }
   return 2.0 * match / (fst.length + snd.length - 2);
 }

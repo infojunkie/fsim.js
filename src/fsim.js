@@ -8,7 +8,7 @@ const CACHE_FILE = '.fsimcache';
 const SEPARATOR = '--';
 const MIN_RATING = 0.7;
 
-let bigrams = new Map;
+let bigrams = new Map();
 
 // https://stackoverflow.com/a/54577682/209184
 function isMochaRunning(context) {
@@ -82,12 +82,13 @@ function replacerMap(key, value) {
   if (value instanceof Map) {
     return {
       dataType: 'Map',
-      value: Array.from(value.entries()), // or with spread: value: [...value]
+      value: [...value],
     };
   } else {
     return value;
   }
 }
+
 function reviverMap(key, value) {
   if (typeof value === 'object' && value !== null) {
     if (value.dataType === 'Map') {
@@ -109,15 +110,15 @@ export function fsim(options) {
   }
 
   const ignores = readIgnores(path.join(options.dir, IGNORE_FILE), options.separator);
-  const files = getFiles(options.dir, options.recursive);
   const results = [];
-  let file;
-  while (file = files.shift()) {
+  const files = getFiles(options.dir, options.recursive, path.normalize(options.dir + path.sep));
+  files.forEach(file => {
+    files.delete(file.filepath);
     const matches = findSimilar(file, files, options.minRating, ignores);
     if (matches.length) {
-      results.push(Array(file.filepath).concat(matches.map(match => match.file.filepath)));
+      results.push(Array(file.filepath).concat(matches.map(match => match.filepath)));
     }
-  }
+  });
 
   if (options.cache) {
     try {
@@ -139,20 +140,26 @@ function stripExtension(file) {
   return file;
 }
 
-function findSimilar(file, files, minRating, ignores) {
-  const ignore = (ignores && ignores.get(file.filepath)) ?? [];
-  // Calculate distance between filenames.
-  return files
-  .map(f => { return { file: f, rating: dice(file.filename, f.filename) }})
-  .filter(r => r.rating > minRating && !ignore.includes(r.file.filepath))
-  .map(r => {
-    // Remove the matched files from the set before recursing on them.
-    files.splice(files.findIndex(f => f.filepath === r.file.filepath), 1);
-    return r;
+function findSimilar(ref, files, minRating, ignores) {
+  const ignore = (ignores && ignores.get(ref.filepath)) ?? [];
+
+  // Find similar files to the reference:
+  return Array.from(files.values())
+  // 1. Filter out ignored files
+  .filter(file => !ignore.includes(file.filepath))
+  // 2. Calculate distance between reference and candidate
+  .map(file => { return { ...file, rating: dice(ref.filename, file.filename) }})
+  // 3. filter out results < threshold
+  .filter(file => file.rating > minRating)
+  // 4. Remove results from active set before recursing.
+  .map(file => {
+    files.delete(file.filepath);
+    return file;
   })
-  .reduce((matches, r) => {
-    matches.push(r);
-    return matches.concat(findSimilar(r.file, files, minRating, ignores));
+  // 5. Recurse on each result to aggregate similars.
+  .reduce((matches, file) => {
+    matches.push(file);
+    return matches.concat(findSimilar(file, files, minRating, ignores));
   }, []);
 }
 
@@ -160,7 +167,7 @@ function readIgnores(ignoreFile, separator) {
   if (!fs.existsSync(ignoreFile)) return new Map();
 
   try {
-    return fs.readFileSync(ignoreFile, { encoding: 'utf8', flag: 'r' }).split(/[\n\r]/).reduce((state, line) => {
+    return fs.readFileSync(ignoreFile, { encoding: 'utf8', flag: 'r' }).split(/[\n\r]/).reduce((state, line, index, lines) => {
       const clean = line.trim();
       if (clean === separator) {
         state.current.forEach(k => {
@@ -169,7 +176,6 @@ function readIgnores(ignoreFile, separator) {
         state.current = [];
       } else if (clean.length) {
         state.current.push(clean);
-        // FIXME if this is the very last line, add this last set.
       }
       return state;
     }, { ignores: new Map(), current: [] }).ignores;
@@ -180,16 +186,23 @@ function readIgnores(ignoreFile, separator) {
   }
 }
 
-function getFiles(dir, recursive, prefix = null) {
+function getFiles(dir, recursive, prefix) {
   return fs.readdirSync(dir).reduce((files, file) => {
     const filepath = path.join(dir, file);
-    const isDirectory = fs.statSync(filepath).isDirectory();
-    const realPrefix = prefix ?? (path.normalize(dir) + path.sep);
-    return isDirectory && recursive ? [...files, ...getFiles(filepath, recursive, realPrefix)] : [...files, {
-      filepath: filepath.replace(realPrefix, ''),
-      filename: stripExtension(file)
-    }];
-  }, []);
+    if (fs.statSync(filepath).isDirectory()) {
+      if (recursive) {
+        return new Map([...files, ...getFiles(filepath, recursive, prefix)]);
+      }
+    }
+    else {
+      const relpath = filepath.replace(prefix, '');
+      files.set(relpath, {
+        filepath: relpath,
+        filename: stripExtension(file),
+      });
+    }
+    return files;
+  }, new Map());
 }
 
 // Implementation of Dice coefficient with memoization of bigrams
@@ -216,8 +229,19 @@ function dice(fst, snd) {
   const map1 = getBigrams(fst);
   const map2 = getBigrams(snd);
   let match = 0;
-  map1.forEach((v, k) => {
-    match += Math.min(v, map2.get(k) || 0);
-  });
+  if (map1.length > map2.length) {
+    map2.forEach((v, k) => {
+      if (map1.has(k)) {
+        match += Math.min(v, map1.get(k));
+      }
+    });
+  }
+  else {
+    map1.forEach((v, k) => {
+      if (map2.has(k)) {
+        match += Math.min(v, map2.get(k));
+      }
+    });
+  }
   return 2.0 * match / (fst.length + snd.length - 2);
 }
